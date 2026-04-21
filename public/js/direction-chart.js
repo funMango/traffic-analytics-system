@@ -269,7 +269,7 @@ const DirectionChartManager = (() => {
   // 반환: Array<null | undefined | { directions: string[] }>
   //   null      → 모든 방향 정상
   //   undefined → 미래 슬롯 (아직 미수신)
-  //   { directions } → 결측 방향 목록
+  //   { directions } → 결측 방향 목록 (부분 결측 포함)
   function buildApproachMissingData(approaches, rows, isToday, nullSlots = []) {
     const acsrMaps = new Map();
     for (const ap of approaches) acsrMaps.set(ap.acsrId, new Map());
@@ -298,11 +298,17 @@ const DirectionChartManager = (() => {
         if (nullSet.has(l)) return { directions: approaches.map(ap => ap.name) };
         return undefined;
       }
-      const allZero = approaches.length > 0 && approaches.every(ap => {
-        const row = acsrMaps.get(ap.acsrId)?.get(l);
-        return !row || (row.TRF_QNTY ?? 0) === 0;
-      });
-      return allZero ? { directions: approaches.map(ap => ap.name) } : null;
+
+      if (approaches.length === 0) return null;
+
+      const missingDirections = approaches
+        .filter(ap => {
+          const row = acsrMaps.get(ap.acsrId)?.get(l);
+          return !row || (row.TRF_QNTY ?? 0) === 0;
+        })
+        .map(ap => ap.name);
+
+      return missingDirections.length > 0 ? { directions: missingDirections } : null;
     });
   }
 
