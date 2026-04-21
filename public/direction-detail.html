@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Direction Detail</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+  />
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8f9fa;
+      color: #191c1d;
+      font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+    }
+
+    #directionName {
+      font-size: clamp(28px, 5vw, 52px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      text-align: center;
+      padding: 0 20px;
+      word-break: keep-all;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="directionName">No Direction</h1>
+
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      const directionName = params.get('acsr_name');
+      const el = document.getElementById('directionName');
+      if (directionName) {
+        el.textContent = directionName;
+        document.title = `${directionName} Detail`;
+      }
+    })();
+  </script>
+</body>
+</html>

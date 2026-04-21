@@ -6,7 +6,7 @@
  *
  * DB 연결이 필요한 테스트는 환경변수 INTEGRATION=1 일 때만 실행.
  */
-const { test, describe, before, after } = require('node:test');
+const { test, describe, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 
@@ -60,6 +60,8 @@ const MOCK_HOURLY_TRAFFIC = [
   { TOT_DT: new Date('2026-03-16T01:00:00'), TRF_QNTY: 60, AVG_SPD: 60, OCPN_RATE: 0.3, CLBR_TRF_QNTY: 58, PDST_QNTY: 8,  LOS: 'A' },
 ];
 
+let mockHealthCheckFails = false;
+
 // db.js 모킹
 require.cache[require.resolve('../db')] = {
   id: require.resolve('../db'),
@@ -69,6 +71,12 @@ require.cache[require.resolve('../db')] = {
     initPool: async () => {},
     closePool: async () => {},
     execute: async (sql, binds) => {
+      if (sql.includes('SELECT 1 FROM DUAL')) {
+        if (mockHealthCheckFails) {
+          throw new Error('DB unavailable');
+        }
+        return { rows: [{ '1': 1 }] };
+      }
       // 교차로 전체 목록
       if (sql.includes('M_CRSRD_INF') && !sql.includes('LIKE')) {
         return { rows: MOCK_INTERSECTIONS };
@@ -110,6 +118,7 @@ require.cache[require.resolve('../services/poller')] = {
     stopPoller: () => {},
     initUpdateTimes: async () => {},
     getNullSlotsForDate: () => [],
+    getTargetUpdateTime: () => null,
   },
 };
 
@@ -167,6 +176,10 @@ before(() => {
 
 after(() => {
   return new Promise(resolve => server.close(resolve));
+});
+
+beforeEach(() => {
+  mockHealthCheckFails = false;
 });
 
 // ─── 테스트 ──────────────────────────────────────────
@@ -350,5 +363,28 @@ describe('GET /api/sse', () => {
       });
       req.end();
     });
+  });
+});
+
+describe('GET /api/system/health', () => {
+  test('DB 연결 정상 시 healthy 응답', async () => {
+    const { status, body } = await request(server, 'GET', '/api/system/health');
+    assert.equal(status, 200);
+    assert.equal(body.ok, true);
+    assert.equal(body.status, 'healthy');
+    assert.equal(body.db, 'connected');
+    assert.match(body.checkedAt, /^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  test('DB 연결 실패 시 degraded 응답', async () => {
+    mockHealthCheckFails = true;
+
+    const { status, body } = await request(server, 'GET', '/api/system/health');
+    assert.equal(status, 503);
+    assert.equal(body.ok, false);
+    assert.equal(body.status, 'degraded');
+    assert.equal(body.db, 'disconnected');
+    assert.equal(body.error, 'DB_UNAVAILABLE');
+    assert.match(body.checkedAt, /^\d{4}-\d{2}-\d{2}T/);
   });
 });

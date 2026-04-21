@@ -19,6 +19,10 @@ const App = (() => {
     intersectionHistory: [],     // [{ nodeId, name }] 이전 교차로 스택
   };
 
+  const HEALTH_CHECK_INTERVAL_MS = 30_000;
+  let healthPollTimer = null;
+  let healthCheckInFlight = null;
+
   // ─── 유틸 ────────────────────────────────────────
   function todayStr() {
     const now = new Date();
@@ -104,7 +108,147 @@ const App = (() => {
     sidebarOpenTab: () => document.getElementById('sidebarOpenTab'),
     filterClearBtn: () => document.getElementById('filterClearBtn'),
     backBtn: () => document.getElementById('backBtn'),
+    directionButtons: () => document.getElementById('directionButtons'),
+    systemHealthBadge: () => document.getElementById('systemHealthBadge'),
+    systemHealthDot: () => document.getElementById('systemHealthDot'),
+    systemHealthText: () => document.getElementById('systemHealthText'),
   };
+
+  function setSystemHealthUI(status) {
+    const badge = els.systemHealthBadge();
+    const dot = els.systemHealthDot();
+    const text = els.systemHealthText();
+    if (!badge || !dot || !text) return;
+
+    dot.classList.remove('bg-tertiary', 'bg-error', 'bg-outline');
+    text.classList.remove('text-tertiary', 'text-error', 'text-on-surface-variant');
+    badge.disabled = status === 'checking';
+
+    if (status === 'healthy') {
+      dot.classList.add('bg-tertiary');
+      text.classList.add('text-tertiary');
+      text.textContent = '시스템 정상';
+      return;
+    }
+
+    if (status === 'degraded') {
+      dot.classList.add('bg-error');
+      text.classList.add('text-error');
+      text.textContent = 'DB 연결 불량';
+      return;
+    }
+
+    dot.classList.add('bg-outline');
+    text.classList.add('text-on-surface-variant');
+    text.textContent = '상태 확인중';
+  }
+
+  function isApiNotAppliedHealthError(err) {
+    if (!err || typeof err !== 'object') return false;
+    if (err.code === 'HEALTH_API_NOT_APPLIED' || err.reason === 'API_NOT_APPLIED') return true;
+    return err.status === 404 && String(err.contentType || '').includes('text/html');
+  }
+
+  async function checkSystemHealth() {
+    if (healthCheckInFlight) return healthCheckInFlight;
+
+    setSystemHealthUI('checking');
+    healthCheckInFlight = requestSystemHealth()
+      .then((result) => {
+        if (result && result.ok) {
+          setSystemHealthUI('healthy');
+        } else {
+          setSystemHealthUI('degraded');
+        }
+      })
+      .catch((err) => {
+        if (err && err.name === 'AbortError') return;
+        if (isApiNotAppliedHealthError(err)) {
+          console.error('[SystemHealth] /api/system/health API not reflected on running server', {
+            status: err.status,
+            contentType: err.contentType,
+            code: err.code,
+            message: err.message,
+          });
+        } else {
+          console.error('[SystemHealth] check failed', {
+            status: err && err.status,
+            code: err && err.code,
+            message: err && err.message,
+          });
+        }
+        setSystemHealthUI('degraded');
+      })
+      .finally(() => {
+        healthCheckInFlight = null;
+      });
+
+    return healthCheckInFlight;
+  }
+
+  async function requestSystemHealth() {
+    if (typeof API.getSystemHealth === 'function') {
+      return API.getSystemHealth();
+    }
+
+    const res = await fetch('/api/system/health');
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const isJson = contentType.includes('application/json');
+    let body = {};
+
+    if (isJson) {
+      body = await res.json().catch(() => ({}));
+    } else {
+      const raw = await res.text().catch(() => '');
+      body = raw ? { raw } : {};
+    }
+
+    if (!res.ok) {
+      const err = new Error(body.error || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.body = body;
+      err.contentType = contentType;
+      if (res.status === 404 && !isJson) {
+        err.code = 'HEALTH_API_NOT_APPLIED';
+        err.reason = 'API_NOT_APPLIED';
+      }
+      throw err;
+    }
+
+    if (!isJson) {
+      const err = new Error('Invalid health response content type');
+      err.status = res.status;
+      err.body = body;
+      err.contentType = contentType;
+      err.code = 'HEALTH_API_INVALID_RESPONSE';
+      throw err;
+    }
+
+    return body;
+  }
+
+  function startSystemHealthPolling() {
+    stopSystemHealthPolling();
+    void checkSystemHealth();
+    healthPollTimer = setInterval(() => {
+      void checkSystemHealth();
+    }, HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  function stopSystemHealthPolling() {
+    if (healthPollTimer) {
+      clearInterval(healthPollTimer);
+      healthPollTimer = null;
+    }
+  }
+
+  function bindSystemHealthBadgeClick() {
+    const badge = els.systemHealthBadge();
+    if (!badge) return;
+    badge.addEventListener('click', () => {
+      void checkSystemHealth();
+    });
+  }
 
   // ─── 교차로 목록 렌더 ─────────────────────────────
   function renderSidebarList(list) {
@@ -127,6 +271,39 @@ const App = (() => {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  }
+
+  function renderDirectionButtons(approaches) {
+    const container = els.directionButtons();
+    if (!container) return;
+
+    if (!state.selectedNodeId || !Array.isArray(approaches) || approaches.length === 0) {
+      container.style.display = 'none';
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = approaches.map(ap =>
+      `<button type="button" class="direction-btn" data-acsr-id="${escHtml(ap.acsrId)}" data-acsr-name="${escHtml(ap.name)}">${escHtml(ap.name)}</button>`
+    ).join('');
+    container.style.display = 'flex';
+  }
+
+  function bindDirectionButtonClick() {
+    const container = els.directionButtons();
+    if (!container) return;
+
+    container.addEventListener('click', e => {
+      const btn = e.target.closest('button[data-acsr-id][data-acsr-name]');
+      if (!btn || !state.selectedNodeId) return;
+
+      const params = new URLSearchParams();
+      params.set('node_id', state.selectedNodeId);
+      params.set('acsr_id', btn.dataset.acsrId);
+      params.set('acsr_name', btn.dataset.acsrName);
+      if (state.currentDate) params.set('date', state.currentDate);
+      window.location.href = `/direction-detail.html?${params.toString()}`;
+    });
   }
 
   // ─── 그래프 로드 (1일) ───────────────────────────
@@ -154,6 +331,7 @@ const App = (() => {
 
       // 접근로 차트
       state.currentApproaches = approachData.approaches;
+      renderDirectionButtons(state.currentApproaches);
       const approachWrapper = document.getElementById('approachChartWrapper');
       if (approachData.approaches.length > 0) {
         DirectionChartManager.init('approachChart', approachData.approaches);
@@ -212,6 +390,7 @@ const App = (() => {
 
       // 접근로 차트
       state.currentApproaches = approachData.approaches;
+      renderDirectionButtons(state.currentApproaches);
       const approachWrapper = document.getElementById('approachChartWrapper');
       if (approachData.approaches.length > 0) {
         DirectionChartManager.initWeekly('approachChart', approachData.approaches, state.currentWeekStart);
@@ -268,6 +447,7 @@ const App = (() => {
 
       // 접근로 차트
       state.currentApproaches = approachData.approaches;
+      renderDirectionButtons(state.currentApproaches);
       const approachWrapper = document.getElementById('approachChartWrapper');
       if (approachData.approaches.length > 0) {
         DirectionChartManager.initMonthly('approachChart', approachData.approaches, state.currentMonthStr);
@@ -326,6 +506,7 @@ const App = (() => {
 
       // 접근로 차트
       state.currentApproaches = approachData.approaches;
+      renderDirectionButtons(state.currentApproaches);
       const approachWrapper = document.getElementById('approachChartWrapper');
       if (approachData.approaches.length > 0) {
         DirectionChartManager.initYearly('approachChart', approachData.approaches, state.currentYearStr);
@@ -368,6 +549,7 @@ const App = (() => {
 
     els.selectedInfo().style.display = 'flex';
     els.selectedName().textContent = name;
+    renderDirectionButtons([]);
 
     renderSidebarList(
       state.allIntersections.filter(i =>
@@ -806,13 +988,17 @@ const App = (() => {
     bindSidebarFilter();
     bindDateNav();
     bindPeriodButtons();
+    bindDirectionButtonClick();
+    bindSystemHealthBadgeClick();
     updateGranularityLabel(state.currentPeriod);
 
     // ─── 페이지 생명주기 관리 (bfcache + fetch 누적 방지) ─────────────────
     let _ctrl = new AbortController();
     API.setAbortSignal(_ctrl.signal);
+    startSystemHealthPolling();
 
     window.addEventListener('pagehide', () => {
+      stopSystemHealthPolling();
       _ctrl.abort();
       API.disconnectSSE();
     });
@@ -822,6 +1008,7 @@ const App = (() => {
       _ctrl = new AbortController();
       API.setAbortSignal(_ctrl.signal);
       API.connectSSE(() => {});
+      startSystemHealthPolling();
       if (state.selectedNodeId) {
         selectIntersection(state.selectedNodeId, state.selectedName, true);
       }

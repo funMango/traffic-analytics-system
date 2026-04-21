@@ -3,6 +3,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const { execute } = require('./db');
 
 const intersectionsRouter = require('./routes/intersections');
 const trafficRouter = require('./routes/traffic');
@@ -21,6 +22,34 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/intersections', intersectionsRouter);
 app.use('/api/traffic', trafficRouter);
 app.use('/api/home', homeRouter);
+
+app.get('/api/system/health', async (req, res) => {
+  const checkedAt = new Date().toISOString();
+
+  try {
+    await execute('SELECT 1 FROM DUAL');
+    res.status(200).json({
+      ok: true,
+      status: 'healthy',
+      db: 'connected',
+      checkedAt,
+    });
+  } catch (err) {
+    const code = err && typeof err === 'object' ? err.code || null : null;
+    const message =
+      err && typeof err === 'object' && typeof err.message === 'string'
+        ? err.message
+        : String(err);
+    console.error('[system/health] DB check failed', { code, message });
+    res.status(503).json({
+      ok: false,
+      status: 'degraded',
+      db: 'disconnected',
+      checkedAt,
+      error: 'DB_UNAVAILABLE',
+    });
+  }
+});
 
 // SSE 클라이언트 관리
 const sseClients = new Set();

@@ -159,63 +159,6 @@ const state = {
   pollTimer: null,
 };
 
-// ── 로딩 진행률 배너 ─────────────────────────────────────────────────────
-const LoadingProgress = (() => {
-  let total = 0;
-  let completed = 0;
-  let hideTimer = null;
-  let generation = 0;  // 연도 변경 경쟁 조건 방지용
-
-  const STEP_LABELS = [
-    '이상 교차로·방향 데이터',
-    '교차로 결측 히트맵',
-    '방향 결측 히트맵',
-  ];
-
-  function _el(id) { return document.getElementById(id); }
-
-  function _render() {
-    const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-    const remaining = total - completed;
-
-    _el('loadingProgressFill').style.width = pct + '%';
-    _el('loadingProgressText').textContent = pct + '% 완료';
-
-    if (completed >= total) {
-      _el('loadingProgressLabel').textContent = '데이터 로딩 완료';
-      _el('loadingProgressSub').textContent = '모든 항목을 불러왔습니다';
-      hideTimer = setTimeout(() => {
-        _el('loadingProgressBanner').classList.add('loading-progress-hidden');
-      }, 800);
-    } else {
-      const lastLabel = STEP_LABELS[completed - 1] ?? '';
-      _el('loadingProgressLabel').textContent =
-        completed === 0 ? '데이터를 불러오는 중…' : `${lastLabel} 완료`;
-      _el('loadingProgressSub').textContent = `${remaining}개 항목 남음`;
-    }
-  }
-
-  return {
-    start(stepCount) {
-      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-      generation++;  // 새 로드 시작 → 이전 advance() 콜백 무효화
-      total = stepCount;
-      completed = 0;
-      _el('loadingProgressFill').style.width = '0%';
-      _el('loadingProgressText').textContent = '0% 완료';
-      _el('loadingProgressSub').textContent = `${stepCount}개 항목 남음`;
-      _el('loadingProgressLabel').textContent = '데이터를 불러오는 중…';
-      _el('loadingProgressBanner').classList.remove('loading-progress-hidden');
-    },
-    advance(gen) {
-      if (gen !== generation) return;  // 이전 연도 로드의 콜백이면 무시
-      completed = Math.min(completed + 1, total);
-      _render();
-    },
-    gen() { return generation; },  // 현재 세대 반환
-  };
-})();
-
 // ── 오늘의 이상 교차로/방향 ────────────────────────────────────────────────
 let todayAbnormalNodes = [];
 let todayAbnormalDirs = [];
@@ -587,11 +530,9 @@ function bindDateNav() {
     YearlyNavigator.open(state.currentYearStr, ys => {
       state.currentYearStr = ys;
       updateDateDisplay();
-      LoadingProgress.start(2);
-      const g = LoadingProgress.gen();
       Promise.all([
-        loadNodeHeatmap().then(() => LoadingProgress.advance(g)),
-        loadDirHeatmap().then(() => LoadingProgress.advance(g)),
+        loadNodeHeatmap(),
+        loadDirHeatmap(),
       ]);
     });
   });
@@ -602,11 +543,9 @@ function changeYear(delta) {
   if (parseInt(newY, 10) > new Date().getFullYear()) return;
   state.currentYearStr = newY;
   updateDateDisplay();
-  LoadingProgress.start(2);
-  const g = LoadingProgress.gen();
   Promise.all([
-    loadNodeHeatmap().then(() => LoadingProgress.advance(g)),   // 50%
-    loadDirHeatmap().then(() => LoadingProgress.advance(g)),    // 100%
+    loadNodeHeatmap(),
+    loadDirHeatmap(),
   ]);
 }
 
@@ -694,13 +633,10 @@ async function init() {
     if (todayAbnormalDirs.length) openAbnormalDirModal(todayAbnormalDirs);
   });
 
-  LoadingProgress.start(3);
-  const initGen = LoadingProgress.gen();
   await loadTodayAbnormal();
-  LoadingProgress.advance(initGen);                                          // 33% — 이상 교차로·방향
   await Promise.all([
-    loadNodeHeatmap().then(() => LoadingProgress.advance(initGen)),          // 66% — 교차로 히트맵
-    loadDirHeatmap().then(() => LoadingProgress.advance(initGen)),           // 100% — 방향 히트맵
+    loadNodeHeatmap(),
+    loadDirHeatmap(),
   ]);
   startPolling();
 

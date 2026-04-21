@@ -80,6 +80,43 @@ const API = (() => {
     return fetchJSON('/api/home/today-abnormal');
   }
 
+  async function getSystemHealth() {
+    const res = await fetch(BASE + '/api/system/health', _globalSignal ? { signal: _globalSignal } : undefined);
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    const isJson = contentType.includes('application/json');
+    let body = {};
+
+    if (isJson) {
+      body = await res.json().catch(() => ({}));
+    } else {
+      const raw = await res.text().catch(() => '');
+      body = raw ? { raw } : {};
+    }
+
+    if (!res.ok) {
+      const err = new Error(body.error || `HTTP ${res.status}`);
+      err.status = res.status;
+      err.body = body;
+      err.contentType = contentType;
+      if (res.status === 404 && !isJson) {
+        err.code = 'HEALTH_API_NOT_APPLIED';
+        err.reason = 'API_NOT_APPLIED';
+      }
+      throw err;
+    }
+
+    if (!isJson) {
+      const err = new Error('Invalid health response content type');
+      err.status = res.status;
+      err.body = body;
+      err.contentType = contentType;
+      err.code = 'HEALTH_API_INVALID_RESPONSE';
+      throw err;
+    }
+
+    return body;
+  }
+
   // SSE 연결
   let es = null;
   const listeners = {};
@@ -184,6 +221,7 @@ const API = (() => {
     getHomeMissingSummary,
     getHomeMissingDetail,
     getHomeTodayAbnormal,
+    getSystemHealth,
     setAbortSignal,
     connectSSE,
     disconnectSSE,
