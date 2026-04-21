@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html class="light" lang="ko">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>교통량 분석 시스템 — 홈</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link as="style" crossorigin=""
+    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="/css/style.css">
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-surface-variant": "#434656",
+            "on-primary-container": "#e3e6ff",
+            "surface-variant": "#e1e3e4",
+            "primary": "#0041c8",
+            "on-tertiary": "#ffffff",
+            "surface-bright": "#f8f9fa",
+            "on-secondary-fixed": "#0f1c2d",
+            "surface-container-high": "#e7e8e9",
+            "error-container": "#ffdad6",
+            "surface-container": "#edeeef",
+            "surface-container-highest": "#e1e3e4",
+            "on-error-container": "#93000a",
+            "inverse-surface": "#2e3132",
+            "surface-tint": "#004dea",
+            "surface-container-low": "#f3f4f5",
+            "on-tertiary-fixed-variant": "#005236",
+            "on-tertiary-container": "#83ffc6",
+            "surface-container-lowest": "#ffffff",
+            "primary-fixed": "#dce1ff",
+            "on-tertiary-fixed": "#002113",
+            "on-secondary-fixed-variant": "#3b485a",
+            "on-surface": "#191c1d",
+            "secondary-container": "#d6e3fb",
+            "on-primary-fixed-variant": "#0039b3",
+            "inverse-on-surface": "#f0f1f2",
+            "background": "#f8f9fa",
+            "outline-variant": "#c3c5d9",
+            "error": "#ba1a1a",
+            "secondary-fixed": "#d6e3fb",
+            "on-primary-fixed": "#001551",
+            "on-background": "#191c1d",
+            "tertiary-fixed": "#6ffbbe",
+            "secondary-fixed-dim": "#bac7de",
+            "outline": "#737688",
+            "tertiary-fixed-dim": "#4edea3",
+            "primary-container": "#0055ff",
+            "on-secondary-container": "#586579",
+            "on-error": "#ffffff",
+            "on-secondary": "#ffffff",
+            "surface-dim": "#d9dadb",
+            "surface": "#f8f9fa",
+            "primary-fixed-dim": "#b6c4ff",
+            "tertiary-container": "#007751",
+            "tertiary": "#005c3e",
+            "inverse-primary": "#b6c4ff",
+            "secondary": "#525f73",
+            "on-primary": "#ffffff"
+          },
+          fontFamily: {
+            "headline": ["Pretendard", "system-ui", "-apple-system", "sans-serif"],
+            "body": ["Pretendard", "system-ui", "-apple-system", "sans-serif"],
+            "label": ["Pretendard", "system-ui", "-apple-system", "sans-serif"]
+          },
+          borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+        },
+      },
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', sans-serif;
+      height: auto;
+      /* style.css의 height: 100vh 무효화 */
+      overflow-y: auto;
+      /* style.css의 overflow: hidden 무효화 */
+    }
+
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      vertical-align: middle;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #e1e3e4;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #c3c5d9;
+    }
+
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* 히트맵 컨테이너 */
+    .gh-heatmap-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .gh-month-row {
+      display: grid;
+      margin-left: 28px;
+    }
+
+    .gh-month-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #737688;
+    }
+
+    .gh-heatmap-grid {
+      display: grid;
+    }
+
+    .gh-day-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #737688;
+      display: flex;
+      align-items: center;
+    }
+
+    .gh-cell {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: #edeeef;
+      cursor: pointer;
+    }
+
+    .gh-cell-pad {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: transparent;
+    }
+
+    .gh-cell-future {
+      background: #edeeef;
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    /* 툴팁 (기존 CSS 유지) */
+    .home-tooltip {
+      position: fixed;
+      z-index: 9999;
+      background: rgba(25, 28, 29, 0.92);
+      color: #f0f1f2;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      line-height: 1.5;
+      pointer-events: none;
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    .home-tooltip.visible {
+      opacity: 1;
+    }
+
+    .htt-time {
+      font-weight: 700;
+    }
+
+    .htt-count {
+      font-weight: 400;
+      color: #b6c4ff;
+    }
+
+    .htt-name {
+      color: #c3c5d9;
+    }
+
+    .htt-more {
+      color: #737688;
+    }
+
+    /* 모달 (기존 CSS 유지) */
+    .missing-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: rgba(0, 0, 0, 0.4);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .missing-modal.visible {
+      display: flex;
+    }
+
+    .missing-modal-box {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px 24px;
+      min-width: 280px;
+      max-width: 480px;
+      max-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+      overflow: hidden;
+    }
+
+    .missing-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+    }
+
+    .missing-modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #191c1d;
+    }
+
+    .missing-modal-close {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: none;
+      background: #f3f4f5;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .missing-modal-close:hover {
+      background: #e1e3e4;
+    }
+
+    .missing-modal-list {
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .missing-modal-item {
+      height: 36px;
+      padding: 0 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #191c1d;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex-shrink: 0;
+    }
+
+    .missing-modal-item:hover {
+      background: #f3f4f5;
+    }
+
+    /* 로딩 스피너 */
+    .loading-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 76px;
+    }
+
+    .loading-spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #e1e3e4;
+      border-top-color: #0041c8;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* 로딩 진행률 배너 */
+    .loading-progress-banner {
+      border: 1px solid rgba(0,65,200,0.15);
+      background: rgba(0,65,200,0.04);
+      border-radius: 12px;
+      padding: 12px 16px;
+      transition: opacity 0.5s ease, max-height 0.5s ease, padding 0.5s ease, border-color 0.5s ease;
+      max-height: 80px;
+      overflow: hidden;
+    }
+    .loading-progress-hidden {
+      opacity: 0;
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      pointer-events: none;
+      border-color: transparent;
+    }
+    .loading-progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: #0041c8;
+      margin-bottom: 6px;
+    }
+    .loading-progress-track {
+      height: 4px;
+      background: rgba(0,65,200,0.12);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #loadingProgressFill {
+      height: 100%;
+      width: 0%;
+      background: #0041c8;
+      border-radius: 2px;
+      transition: width 0.4s cubic-bezier(.4,0,.2,1);
+    }
+    .loading-progress-sub {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 4px;
+    }
+    .dark .loading-progress-banner {
+      background: rgba(182,196,255,0.06);
+      border-color: rgba(182,196,255,0.2);
+    }
+    .dark .loading-progress-header { color: #b6c4ff; }
+    .dark #loadingProgressFill { background: #b6c4ff; }
+    .dark .loading-progress-track { background: rgba(182,196,255,0.15); }
+  </style>
+</head>
+
+<body class="bg-surface font-body text-on-surface">
+
+  <!-- 사이드바 컨테이너 -->
+  <div id="sidebar-container"></div>
+
+  <!-- 메인 콘텐츠 -->
+  <main class="ml-64 min-h-screen">
+
+    <!-- 상단 앱바 -->
+    <header class="h-16 flex items-center px-8 bg-surface border-b border-transparent sticky top-0 z-40">
+      <div class="flex items-center justify-end w-full">
+        <div class="flex items-center px-4 py-1.5 rounded-full bg-slate-50 border border-outline-variant/20 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-tertiary mr-2"></span>
+          <span class="text-[10px] font-bold text-tertiary uppercase tracking-wide">시스템 정상</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- 대시보드 캔버스 -->
+    <div class="p-8 space-y-8 max-w-7xl mx-auto">
+
+      <!-- 페이지 헤더 -->
+      <div class="flex flex-col">
+        <h3 class="font-headline font-bold text-2xl text-on-surface">데이터 결측 현황</h3>
+        <p class="text-sm text-on-surface-variant mt-1">실시간 교통 데이터 수집 및 결측 정보 정밀 분석</p>
+      </div>
+
+      <!-- 로딩 진행률 배너 -->
+      <div id="loadingProgressBanner" class="loading-progress-banner loading-progress-hidden">
+        <div class="loading-progress-header">
+          <span id="loadingProgressLabel">데이터를 불러오는 중…</span>
+          <span id="loadingProgressText">0% 완료</span>
+        </div>
+        <div class="loading-progress-track">
+          <div id="loadingProgressFill"></div>
+        </div>
+        <div id="loadingProgressSub" class="loading-progress-sub"></div>
+      </div>
+
+      <!-- 통계 카드 -->
+      <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- 오늘의 이상 교차로 -->
+        <div id="todayAbnormalCard"
+          class="bg-surface-container-lowest p-6 relative overflow-hidden group border border-surface-container rounded-3xl cursor-pointer hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <p class="text-xs font-bold text-outline uppercase tracking-widest mb-1">오늘의 이상 교차로</p>
+              <h4 class="font-headline text-4xl font-extrabold text-on-surface">
+                <span id="todayAbnormalCount">—</span>
+                <span class="text-lg font-medium text-outline ml-1">개 교차로</span>
+              </h4>
+            </div>
+            <div class="bg-error-container/20 p-3 rounded-lg">
+              <span class="material-symbols-outlined text-error">warning</span>
+            </div>
+          </div>
+          <div class="flex items-center text-xs text-outline">
+            <span class="material-symbols-outlined mr-1" style="font-size:14px;">touch_app</span>
+            클릭하여 목록 보기
+          </div>
+          <div
+            class="absolute -right-4 -bottom-4 w-24 h-24 bg-error/5 rounded-full blur-2xl group-hover:scale-110 transition-transform">
+          </div>
+        </div>
+
+        <!-- 오늘의 이상 방향 -->
+        <div id="todayAbnormalDirCard"
+          class="bg-surface-container-lowest p-6 relative overflow-hidden group border border-surface-container rounded-3xl cursor-pointer hover:shadow-md transition-shadow">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <p class="text-xs font-bold text-outline uppercase tracking-widest mb-1">오늘의 이상 방향</p>
+              <h4 class="font-headline text-4xl font-extrabold text-on-surface">
+                <span id="todayAbnormalDirCount">—</span>
+                <span class="text-lg font-medium text-outline ml-1">개 방향</span>
+              </h4>
+            </div>
+            <div class="bg-primary-container/10 p-3 rounded-lg">
+              <span class="material-symbols-outlined text-primary">near_me</span>
+            </div>
+          </div>
+          <div class="flex items-center text-xs text-outline">
+            <span class="material-symbols-outlined mr-1" style="font-size:14px;">touch_app</span>
+            클릭하여 목록 보기
+          </div>
+          <div
+            class="absolute -right-4 -bottom-4 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:scale-110 transition-transform">
+          </div>
+        </div>
+
+      </section>
+
+      <!-- 연도 네비게이션 -->
+      <div class="flex items-center gap-3">
+        <button id="hmPrevBtn"
+          class="w-8 h-8 rounded-full bg-surface-container-low border border-outline-variant/20 flex items-center justify-center text-outline hover:text-primary hover:bg-white transition-colors">
+          <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+            <path d="M6 1L1 6L6 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+        <button id="hmDateBtn"
+          class="px-4 py-1.5 rounded-full bg-surface-container-low border border-outline-variant/20 text-sm font-bold text-on-surface hover:bg-white transition-colors"></button>
+        <button id="hmNextBtn"
+          class="w-8 h-8 rounded-full bg-surface-container-low border border-outline-variant/20 flex items-center justify-center text-outline hover:text-primary hover:bg-white transition-colors">
+          <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+            <path d="M1 1L6 6L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- 교차로 결측 히트맵 -->
+      <section class="bg-surface-container-lowest p-8 border border-surface-container shadow-sm rounded-3xl">
+        <div class="flex items-center justify-between mb-6">
+          <h5 class="font-headline font-bold text-lg">교차로 결측 히트맵</h5>
+        </div>
+        <div class="overflow-x-auto scrollbar-hide">
+          <div id="nodeHeatmapWrapper">
+            <div class="loading-placeholder">
+              <div class="loading-spinner"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 방향 결측 히트맵 -->
+      <section class="bg-surface-container-lowest p-8 border border-surface-container shadow-sm rounded-3xl">
+        <div class="flex items-center justify-between mb-6">
+          <h5 class="font-headline font-bold text-lg">교차로 결측 방향 히트맵</h5>
+        </div>
+        <div class="overflow-x-auto scrollbar-hide">
+          <div id="dirHeatmapWrapper">
+            <div class="loading-placeholder">
+              <div class="loading-spinner"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 주요 결측 지점 분석 -->
+      <section class="bg-surface-container-lowest p-6 border border-surface-container shadow-sm rounded-3xl pb-12">
+        <div class="flex items-center justify-between mb-6">
+          <h6 class="font-headline font-bold">주요 결측 지점 분석</h6>
+        </div>
+        <div id="abnormalKeyList" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- JS로 채워짐 -->
+          <div class="flex items-center justify-center p-8 text-xs text-outline col-span-2">데이터 로딩 중...</div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- 툴팁 -->
+  <div id="homeTooltip" class="home-tooltip"></div>
+
+  <!-- 결측 상세 모달 -->
+  <div id="missingModal" class="missing-modal">
+    <div class="missing-modal-box">
+      <div class="missing-modal-header">
+        <span id="missingModalTitle" class="missing-modal-title"></span>
+        <button id="missingModalClose" class="missing-modal-close">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+      <div class="missing-modal-list" id="missingModalList"></div>
+    </div>
+  </div>
+
+  <script src="/js/sidebar-component.js"></script>
+  <script src="/js/api.js"></script>
+  <script src="/js/weekly-calendar.js"></script>
+  <script src="/js/yearly-navigator.js"></script>
+  <script src="/js/home.js?v=2"></script>
+</body>
+
+</html>

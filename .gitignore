@@ -1,0 +1,6 @@
+.claude/
+.claudeignore
+.env
+.env.example
+node_modules/
+cache/
