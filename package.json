@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/api.test.js"
+    "test": "node --test tests/api.test.js",
+    "architecture:check": "node scripts/check-architecture.js",
+    "quality": "npm run architecture:check && npm test"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
