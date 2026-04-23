@@ -18,23 +18,147 @@ function escHtml(str) {
 }
 
 // ── 프론트엔드 캐시 (localStorage, stale-while-revalidate) ─────────────────
-const HEATMAP_CACHE_TTL = 55 * 60 * 1000; // 55분
+const HEATMAP_CACHE_PREFIX = 'home.hm.v1.';
+const HEATMAP_CACHE_VERSION = 1;
+const HEATMAP_CACHE_KEEP_YEARS = 3;
+const TODAY_ABNORMAL_CACHE_PREFIX = 'home.ta.v1.';
+const TODAY_ABNORMAL_CACHE_VERSION = 1;
+const HEATMAP_TYPES = new Set(['node', 'direction']);
+
+function getHeatmapCacheKey(year, type) {
+  return `${HEATMAP_CACHE_PREFIX}${year}.${type}`;
+}
+
+function getTodayAbnormalCacheKey(dateStr) {
+  return `${TODAY_ABNORMAL_CACHE_PREFIX}${dateStr}`;
+}
+
+function toHeatmapSlots(payload) {
+  if (!payload || !Array.isArray(payload.slots)) return [];
+  return payload.slots.filter(slot => slot && typeof slot.slotKey === 'string');
+}
+
+function pruneHeatmapCache() {
+  try {
+    const currentYear = new Date().getFullYear();
+    const minYear = currentYear - (HEATMAP_CACHE_KEEP_YEARS - 1);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(HEATMAP_CACHE_PREFIX)) continue;
+
+      const parts = key.split('.');
+      if (parts.length !== 5) {
+        localStorage.removeItem(key);
+        continue;
+      }
+
+      const year = parseInt(parts[3], 10);
+      const type = parts[4];
+      if (!Number.isFinite(year) || !HEATMAP_TYPES.has(type) || year < minYear || year > currentYear) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch (e) {
+    console.warn('[HomeApp] 히트맵 캐시 정리 실패:', e.name, e.message);
+  }
+}
 
 function getCachedHeatmap(year, type) {
+  if (!HEATMAP_TYPES.has(type)) return null;
+  pruneHeatmapCache();
   try {
-    const raw = localStorage.getItem(`hm_${year}_${type}`);
+    const raw = localStorage.getItem(getHeatmapCacheKey(year, type));
     if (!raw) return null;
-    const { data, cachedAt } = JSON.parse(raw);
-    if (Date.now() - cachedAt < HEATMAP_CACHE_TTL) return data;
+
+    const cached = JSON.parse(raw);
+    if (!cached || typeof cached !== 'object') return null;
+    if (cached.version !== HEATMAP_CACHE_VERSION) return null;
+    if (String(cached.year) !== String(year)) return null;
+    if (cached.type !== type) return null;
+
+    return { ...cached, slots: toHeatmapSlots(cached) };
+  } catch {
     return null;
-  } catch { return null; }
+  }
 }
 
 function setCachedHeatmap(year, type, data) {
+  if (!HEATMAP_TYPES.has(type)) return;
+  pruneHeatmapCache();
   try {
-    localStorage.setItem(`hm_${year}_${type}`, JSON.stringify({ data, cachedAt: Date.now() }));
+    const payload = {
+      version: HEATMAP_CACHE_VERSION,
+      year: String(year),
+      type,
+      cachedAt: Date.now(),
+      slots: toHeatmapSlots(data),
+    };
+    localStorage.setItem(getHeatmapCacheKey(year, type), JSON.stringify(payload));
   } catch (e) {
     console.warn(`[HomeApp] 히트맵 캐시 저장 실패 (${year}/${type}):`, e.name, e.message);
+  }
+}
+
+function mergeHeatmapPayload(cachedPayload, freshPayload) {
+  const cachedSlots = toHeatmapSlots(cachedPayload);
+  const freshSlots = toHeatmapSlots(freshPayload);
+
+  if (freshSlots.length === 0) {
+    return { slots: cachedSlots };
+  }
+
+  const merged = new Map();
+  for (const slot of cachedSlots) merged.set(slot.slotKey, slot);
+  for (const slot of freshSlots) merged.set(slot.slotKey, slot);
+
+  return {
+    slots: Array.from(merged.values()).sort((a, b) => a.slotKey.localeCompare(b.slotKey)),
+  };
+}
+
+function pruneTodayAbnormalCache(today = todayStr()) {
+  try {
+    const keepKey = getTodayAbnormalCacheKey(today);
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(TODAY_ABNORMAL_CACHE_PREFIX)) continue;
+      if (key !== keepKey) localStorage.removeItem(key);
+    }
+  } catch (e) {
+    console.warn('[HomeApp] today-abnormal 캐시 정리 실패:', e.name, e.message);
+  }
+}
+
+function getCachedTodayAbnormal(dateStr = todayStr()) {
+  pruneTodayAbnormalCache(dateStr);
+  try {
+    const raw = localStorage.getItem(getTodayAbnormalCacheKey(dateStr));
+    if (!raw) return null;
+
+    const cached = JSON.parse(raw);
+    if (!cached || typeof cached !== 'object') return null;
+    if (cached.version !== TODAY_ABNORMAL_CACHE_VERSION) return null;
+    if (cached.date !== dateStr) return null;
+    if (!cached.payload || typeof cached.payload !== 'object') return null;
+
+    return cached.payload;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedTodayAbnormal(dateStr, payload) {
+  pruneTodayAbnormalCache(dateStr);
+  try {
+    const value = {
+      version: TODAY_ABNORMAL_CACHE_VERSION,
+      date: dateStr,
+      cachedAt: Date.now(),
+      payload: payload && typeof payload === 'object' ? payload : {},
+    };
+    localStorage.setItem(getTodayAbnormalCacheKey(dateStr), JSON.stringify(value));
+  } catch (e) {
+    console.warn(`[HomeApp] today-abnormal 캐시 저장 실패 (${dateStr}):`, e.name, e.message);
   }
 }
 
@@ -163,18 +287,35 @@ const state = {
 let todayAbnormalNodes = [];
 let todayAbnormalDirs = [];
 
+function applyTodayAbnormalData(data) {
+  const count = Number(data?.count ?? 0);
+  const directionCount = Number(data?.directionCount ?? 0);
+  document.getElementById('todayAbnormalCount').textContent =
+    Number.isFinite(count) ? count.toLocaleString() : '0';
+  document.getElementById('todayAbnormalDirCount').textContent =
+    Number.isFinite(directionCount) ? directionCount.toLocaleString() : '0';
+  todayAbnormalNodes = Array.isArray(data?.nodes) ? data.nodes : [];
+  todayAbnormalDirs = Array.isArray(data?.directions) ? data.directions : [];
+  renderAbnormalKeyList();
+}
+
 async function loadTodayAbnormal() {
+  const today = todayStr();
+  const cached = getCachedTodayAbnormal(today);
+  if (cached) {
+    applyTodayAbnormalData(cached);
+  }
+
   try {
     const data = await API.getHomeTodayAbnormal();
-    document.getElementById('todayAbnormalCount').textContent = data.count.toLocaleString();
-    document.getElementById('todayAbnormalDirCount').textContent = (data.directionCount ?? 0).toLocaleString();
-    todayAbnormalNodes = data.nodes || [];
-    todayAbnormalDirs = data.directions || [];
-    renderAbnormalKeyList();
+    setCachedTodayAbnormal(today, data);
+    applyTodayAbnormalData(data);
   } catch (err) {
     console.error('[HomeApp] 이상 교차로 수 로드 오류:', err);
-    document.getElementById('todayAbnormalCount').textContent = '—';
-    document.getElementById('todayAbnormalDirCount').textContent = '—';
+    if (!cached) {
+      document.getElementById('todayAbnormalCount').textContent = '—';
+      document.getElementById('todayAbnormalDirCount').textContent = '—';
+    }
   }
 }
 
@@ -421,13 +562,12 @@ async function loadHeatmap(type, wrapperId, silent = false) {
   const cached = getCachedHeatmap(year, type);
 
   if (cached) {
-    // 캐시 즉시 렌더링
     renderYearHeatmap(wrapperId, cached.slots);
-    // 백그라운드에서 갱신
     API.getHomeMissingSummary({ year, type })
       .then(fresh => {
-        setCachedHeatmap(year, type, fresh);
-        renderYearHeatmap(wrapperId, fresh.slots);
+        const merged = mergeHeatmapPayload(cached, fresh);
+        setCachedHeatmap(year, type, merged);
+        renderYearHeatmap(wrapperId, merged.slots);
       })
       .catch(err => console.error(`[HomeApp] ${type} 히트맵 갱신 오류:`, err));
     return;
@@ -435,9 +575,10 @@ async function loadHeatmap(type, wrapperId, silent = false) {
 
   if (!silent) setLoading(wrapperId);
   try {
-    const data = await API.getHomeMissingSummary({ year, type });
-    setCachedHeatmap(year, type, data);
-    renderYearHeatmap(wrapperId, data.slots);
+    const fresh = await API.getHomeMissingSummary({ year, type });
+    const merged = mergeHeatmapPayload(null, fresh);
+    setCachedHeatmap(year, type, merged);
+    renderYearHeatmap(wrapperId, merged.slots);
   } catch (err) {
     console.error(`[HomeApp] ${type} 히트맵 로드 오류:`, err);
     document.getElementById(wrapperId).innerHTML =
@@ -616,6 +757,8 @@ function initModalClose() {
 async function init() {
   SidebarComponent.render('sidebar-container', 'dashboard');
   state.currentYearStr = todayStr().slice(0, 4);
+  pruneHeatmapCache();
+  pruneTodayAbnormalCache(todayStr());
 
   await initSidebar();
   bindDateNav();

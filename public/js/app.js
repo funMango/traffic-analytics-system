@@ -31,6 +31,20 @@ const App = (() => {
 
   function padZ(n) { return String(n).padStart(2, '0'); }
 
+  function formatLastUpdateDateTime(date) {
+    return [
+      date.getFullYear(),
+      padZ(date.getMonth() + 1),
+      padZ(date.getDate()),
+    ].join('.') + ` ${padZ(date.getHours())}:${padZ(date.getMinutes())}`;
+  }
+
+  function setLastUpdateTimeByDate(date) {
+    const el = els.lastUpdateTime();
+    if (!el) return;
+    el.textContent = `마지막 업데이트: ${formatLastUpdateDateTime(date)}`;
+  }
+
   function getWeekStart(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
@@ -350,8 +364,7 @@ const App = (() => {
       if (rows.length > 0) {
         const last = rows[rows.length - 1];
         const dt = new Date(last.TOT_DT);
-        els.lastUpdateTime().textContent =
-          `마지막 업데이트: ${padZ(dt.getHours())}:${padZ(dt.getMinutes())}`;
+        setLastUpdateTimeByDate(dt);
       } else {
         els.lastUpdateTime().textContent = '데이터 없음';
       }
@@ -407,8 +420,7 @@ const App = (() => {
       if (rows.length > 0) {
         const last = rows[rows.length - 1];
         const dt = new Date(last.TOT_DT);
-        els.lastUpdateTime().textContent =
-          `마지막 업데이트: ${padZ(dt.getHours())}:${padZ(dt.getMinutes())}`;
+        setLastUpdateTimeByDate(dt);
       } else {
         els.lastUpdateTime().textContent = '데이터 없음';
       }
@@ -464,10 +476,7 @@ const App = (() => {
       if (rows.length > 0) {
         const last = rows[rows.length - 1];
         const dt = new Date(last.TOT_DT);
-        const y = dt.getFullYear();
-        const m = padZ(dt.getMonth() + 1);
-        const d = padZ(dt.getDate());
-        els.lastUpdateTime().textContent = `마지막 업데이트: ${y}.${m}.${d} ${padZ(dt.getHours())}:00`;
+        setLastUpdateTimeByDate(dt);
       } else {
         els.lastUpdateTime().textContent = '데이터 없음';
       }
@@ -523,10 +532,7 @@ const App = (() => {
       if (rows.length > 0) {
         const last = rows[rows.length - 1];
         const dt = new Date(last.TOT_DT);
-        const y = dt.getFullYear();
-        const m = padZ(dt.getMonth() + 1);
-        const d = padZ(dt.getDate());
-        els.lastUpdateTime().textContent = `마지막 업데이트: ${y}.${m}.${d}`;
+        setLastUpdateTimeByDate(dt);
       } else {
         els.lastUpdateTime().textContent = '데이터 없음';
       }
@@ -830,8 +836,7 @@ const App = (() => {
         if (myRows.length > 0) {
           const last = myRows[myRows.length - 1];
           const dt = new Date(last.TOT_DT);
-          els.lastUpdateTime().textContent =
-            `마지막 업데이트: ${padZ(dt.getHours())}:${padZ(dt.getMinutes())}`;
+          setLastUpdateTimeByDate(dt);
         }
       }
     });
@@ -877,8 +882,7 @@ const App = (() => {
         if (myRows.length > 0) {
           const last = myRows[myRows.length - 1];
           const dt = new Date(last.TOT_DT);
-          els.lastUpdateTime().textContent =
-            `마지막 업데이트: ${padZ(dt.getHours())}:${padZ(dt.getMinutes())}`;
+          setLastUpdateTimeByDate(dt);
         }
       }
     });
@@ -899,8 +903,7 @@ const App = (() => {
           if (myRows.length > 0) {
             const last = myRows[myRows.length - 1];
             const dt = new Date(last.TOT_DT);
-            els.lastUpdateTime().textContent =
-              `마지막 업데이트: ${dt.getFullYear()}.${padZ(dt.getMonth() + 1)}.${padZ(dt.getDate())} ${padZ(dt.getHours())}:00`;
+            setLastUpdateTimeByDate(dt);
           }
         }
       }
@@ -929,10 +932,7 @@ const App = (() => {
           if (myRows.length > 0) {
             const last = myRows[myRows.length - 1];
             const dt = new Date(last.TOT_DT);
-            const y = dt.getFullYear();
-            const m = padZ(dt.getMonth() + 1);
-            const d = padZ(dt.getDate());
-            els.lastUpdateTime().textContent = `마지막 업데이트: ${y}.${m}.${d}`;
+            setLastUpdateTimeByDate(dt);
           }
         }
       }

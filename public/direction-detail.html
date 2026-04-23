@@ -1,49 +1,290 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html class="light" lang="ko">
+
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Direction Detail</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>방향 상세 분석</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-  <link
-    rel="stylesheet"
+  <link as="style" crossorigin=""
     href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
-  />
+    rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet" />
+
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "on-surface-variant": "#434656",
+            "on-primary-container": "#e3e6ff",
+            "surface-variant": "#e1e3e4",
+            "primary": "#0041c8",
+            "on-tertiary": "#ffffff",
+            "surface-bright": "#f8f9fa",
+            "on-secondary-fixed": "#0f1c2d",
+            "surface-container-high": "#e7e8e9",
+            "error-container": "#ffdad6",
+            "surface-container": "#edeeef",
+            "surface-container-highest": "#e1e3e4",
+            "on-error-container": "#93000a",
+            "inverse-surface": "#2e3132",
+            "surface-tint": "#004dea",
+            "surface-container-low": "#f3f4f5",
+            "on-tertiary-fixed-variant": "#005236",
+            "on-tertiary-container": "#83ffc6",
+            "surface-container-lowest": "#ffffff",
+            "primary-fixed": "#dce1ff",
+            "on-tertiary-fixed": "#002113",
+            "on-secondary-fixed-variant": "#3b485a",
+            "on-surface": "#191c1d",
+            "secondary-container": "#d6e3fb",
+            "on-primary-fixed-variant": "#0039b3",
+            "inverse-on-surface": "#f0f1f2",
+            "background": "#f8f9fa",
+            "outline-variant": "#c3c5d9",
+            "error": "#ba1a1a",
+            "secondary-fixed": "#d6e3fb",
+            "on-primary-fixed": "#001551",
+            "on-background": "#191c1d",
+            "tertiary-fixed": "#6ffbbe",
+            "secondary-fixed-dim": "#bac7de",
+            "outline": "#737688",
+            "tertiary-fixed-dim": "#4edea3",
+            "primary-container": "#0055ff",
+            "on-secondary-container": "#586579",
+            "on-error": "#ffffff",
+            "on-secondary": "#ffffff",
+            "surface-dim": "#d9dadb",
+            "surface": "#f8f9fa",
+            "primary-fixed-dim": "#b6c4ff",
+            "tertiary-container": "#007751",
+            "tertiary": "#005c3e",
+            "inverse-primary": "#b6c4ff",
+            "secondary": "#525f73",
+            "on-primary": "#ffffff"
+          },
+          fontFamily: {
+            "headline": ["Pretendard", "system-ui", "-apple-system", "sans-serif"],
+            "body": ["Pretendard", "system-ui", "-apple-system", "sans-serif"],
+            "label": ["Pretendard", "system-ui", "-apple-system", "sans-serif"]
+          },
+          borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+        },
+      },
+    }
+  </script>
+
+  <link rel="stylesheet" href="/css/style.css">
+
   <style>
     body {
-      margin: 0;
-      min-height: 100vh;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', sans-serif;
+      height: auto;
+      overflow-y: auto;
+    }
+
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      vertical-align: middle;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #e1e3e4;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #c3c5d9;
+    }
+
+    .btn-period {
+      padding: 6px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      border-radius: 0.75rem;
+      border: none;
+      cursor: pointer;
+      color: #434656;
+      background: transparent;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .btn-period:hover {
+      background: #edeeef;
+    }
+
+    .btn-period.active {
+      background: #0041c8;
+      color: #ffffff;
+      box-shadow: 0 1px 4px rgba(0, 65, 200, 0.25);
+    }
+
+    .btn-date-display {
+      background: #ffffff;
+      border: 1px solid #edeeef;
+      color: #191c1d;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 110px;
+      cursor: pointer;
+      border-radius: 0.75rem;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      transition: background 0.15s;
+    }
+
+    .btn-date-display:hover {
+      background: #f3f4f5;
+    }
+
+    .btn-nav-icon {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #f8f9fa;
-      color: #191c1d;
-      font-family: "Pretendard", system-ui, -apple-system, sans-serif;
+      background: #ffffff;
+      border: 1px solid #edeeef;
+      border-radius: 0.75rem;
+      width: 34px;
+      height: 34px;
+      cursor: pointer;
+      color: #434656;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      transition: background 0.15s;
     }
 
-    #directionName {
-      font-size: clamp(28px, 5vw, 52px);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      text-align: center;
-      padding: 0 20px;
-      word-break: keep-all;
+    .btn-nav-icon:hover {
+      background: #f3f4f5;
+    }
+
+    .btn-nav-icon:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #191c1d;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .section-title-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #intersectionList li.active {
+      background: rgba(0, 65, 200, 0.08);
+      color: #0041c8;
+      font-weight: 600;
+    }
+
+    #intersectionList li.keyboard-focused {
+      background: rgba(0, 65, 200, 0.06);
     }
   </style>
 </head>
-<body>
-  <h1 id="directionName">No Direction</h1>
 
-  <script>
-    (() => {
-      const params = new URLSearchParams(window.location.search);
-      const directionName = params.get('acsr_name');
-      const el = document.getElementById('directionName');
-      if (directionName) {
-        el.textContent = directionName;
-        document.title = `${directionName} Detail`;
-      }
-    })();
-  </script>
+<body class="bg-surface font-body text-on-surface">
+  <div id="sidebar-container"></div>
+
+  <main class="ml-64 min-h-screen">
+    <header class="min-h-16 flex items-center px-8 py-3 bg-surface border-b border-outline-variant/10 sticky top-0 z-40">
+      <div class="flex items-center justify-between w-full">
+        <div class="flex items-center gap-3">
+          <button id="backBtn"
+            class="flex items-center justify-center w-8 h-8 rounded-xl bg-surface-container text-outline hover:text-primary hover:bg-surface-container-high transition-colors"
+            title="교차로 상세로 돌아가기" aria-label="교차로 상세로 돌아가기">
+            <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+              <path d="M6 1L1 6L6 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div>
+            <h2 id="directionName" class="text-lg font-bold tracking-tight text-on-surface leading-tight">방향 상세 분석</h2>
+            <div class="flex items-center gap-2 mt-0.5">
+              <span id="intersectionName" class="text-[11px] text-on-surface-variant font-medium"></span>
+              <span class="text-[11px] text-outline">|</span>
+              <span id="lastUpdateTime" class="text-[11px] text-on-surface-variant font-medium">데이터 없음</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="p-8 space-y-6 max-w-7xl">
+      <div class="flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-2">
+          <button id="prevDay" class="btn-nav-icon" title="이전">
+            <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+              <path d="M6 1L1 6L6 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </button>
+          <div class="date-btn-wrapper">
+            <button id="currentDateBtn" class="btn-date-display"></button>
+            <input type="date" id="datePicker">
+          </div>
+          <button id="nextDay" class="btn-nav-icon" title="다음">
+            <svg width="7" height="12" viewBox="0 0 7 12" fill="none">
+              <path d="M1 1L6 6L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </button>
+        </div>
+
+        <div
+          class="flex items-center bg-surface-container-lowest p-1 rounded-2xl border border-surface-container shadow-sm">
+          <button class="btn-period active" data-period="1d">1일</button>
+          <button class="btn-period" data-period="1w">1주</button>
+          <button class="btn-period" data-period="1m">1달</button>
+          <button class="btn-period" data-period="1y">1년</button>
+        </div>
+      </div>
+
+      <section class="bg-surface-container-lowest rounded-3xl p-6">
+        <div class="section-title">
+          <span class="section-title-dot bg-primary"></span>
+          교통량 <span id="chartGranularity" class="chart-granularity"></span>
+        </div>
+        <div class="chart-container" style="height: 40vh;">
+          <div id="chartPlaceholder" class="chart-placeholder">
+            <p>방향 교통량을 불러오는 중입니다.</p>
+          </div>
+          <div class="chart-scroll-inner">
+            <canvas id="trafficChart" style="display:none;"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="/js/sidebar-component.js"></script>
+  <script src="/js/api.js?v=4"></script>
+  <script src="/js/chart-manager.js?v=2"></script>
+  <script src="/js/weekly-calendar.js?v=2"></script>
+  <script src="/js/monthly-navigator.js?v=2"></script>
+  <script src="/js/yearly-navigator.js?v=2"></script>
+  <script src="/js/direction-detail.js?v=2"></script>
 </body>
+
 </html>
