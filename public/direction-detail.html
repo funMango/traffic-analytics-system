@@ -275,16 +275,32 @@
           </div>
         </div>
       </section>
+
+      <section class="bg-surface-container-lowest rounded-3xl p-6">
+        <div class="section-title">
+          <span class="section-title-dot bg-tertiary"></span>
+          방향별 교통량 <span id="turnChartGranularity" class="chart-granularity"></span>
+        </div>
+        <div class="chart-container" style="height: 40vh;">
+          <div id="turnChartPlaceholder" class="chart-placeholder">
+            <p>방향별 교통량 데이터를 불러오는 중입니다.</p>
+          </div>
+          <div class="chart-scroll-inner">
+            <canvas id="turnTrafficChart" style="display:none;"></canvas>
+          </div>
+        </div>
+      </section>
     </div>
   </main>
 
   <script src="/js/sidebar-component.js"></script>
   <script src="/js/api.js?v=4"></script>
   <script src="/js/chart-manager.js?v=2"></script>
+  <script src="/js/direction-turn-chart.js?v=7"></script>
   <script src="/js/weekly-calendar.js?v=2"></script>
   <script src="/js/monthly-navigator.js?v=2"></script>
   <script src="/js/yearly-navigator.js?v=2"></script>
-  <script src="/js/direction-detail.js?v=2"></script>
+  <script src="/js/direction-detail.js?v=4"></script>
 </body>
 
 </html>

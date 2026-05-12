@@ -10,9 +10,6 @@ const { test, describe, before, after, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 
-// ─── 환경변수 로드 ───────────────────────────────────
-require('dotenv').config();
-
 // ─── 경량 HTTP 헬퍼 ──────────────────────────────────
 function request(server, method, path, body) {
   return new Promise((resolve, reject) => {
@@ -60,6 +57,12 @@ const MOCK_HOURLY_TRAFFIC = [
   { TOT_DT: new Date('2026-03-16T01:00:00'), TRF_QNTY: 60, AVG_SPD: 60, OCPN_RATE: 0.3, CLBR_TRF_QNTY: 58, PDST_QNTY: 8,  LOS: 'A' },
 ];
 
+const MOCK_DIRECTION_TRAFFIC = [
+  { NODE_ID: 'A001', ACSR_ID: '1', DRCT_CD: '01', TOT_DT: new Date('2026-03-18T00:00:00'), TRF_QNTY: 4 },
+  { NODE_ID: 'A001', ACSR_ID: '1', DRCT_CD: '02', TOT_DT: new Date('2026-03-18T00:00:00'), TRF_QNTY: 9 },
+  { NODE_ID: 'A001', ACSR_ID: '1', DRCT_CD: '03', TOT_DT: new Date('2026-03-18T00:00:00'), TRF_QNTY: 2 },
+];
+
 let mockHealthCheckFails = false;
 
 // db.js 모킹
@@ -76,6 +79,9 @@ require.cache[require.resolve('../db')] = {
           throw new Error('DB unavailable');
         }
         return { rows: [{ '1': 1 }] };
+      }
+      if (sql.includes('S_CRSRD_DRCT_TRF_')) {
+        return { rows: MOCK_DIRECTION_TRAFFIC };
       }
       // 교차로 전체 목록
       if (sql.includes('M_CRSRD_INF') && !sql.includes('LIKE')) {
@@ -338,6 +344,50 @@ describe('GET /api/traffic/yearly', () => {
     assert.equal(status, 200);
     assert.ok(Array.isArray(body.rows), 'rows가 배열이어야 함');
     assert.ok(Array.isArray(body.nullSlots), 'nullSlots가 배열이어야 함');
+  });
+});
+
+describe('GET /api/traffic/direction', () => {
+  test('acsr_id missing returns 400', async () => {
+    const { status } = await request(server, 'GET', '/api/traffic/direction?node_id=A001&date=2026-03-18');
+    assert.equal(status, 400);
+  });
+
+  test('daily direction response has directions, rows, nullSlots', async () => {
+    const { status, body } = await request(server, 'GET', '/api/traffic/direction?node_id=A001&acsr_id=1&date=2026-03-18');
+    assert.equal(status, 200);
+    assert.deepEqual(body.directions, [
+      { drctCd: '01', label: '좌' },
+      { drctCd: '02', label: '직' },
+      { drctCd: '03', label: '우' },
+    ]);
+    assert.ok(Array.isArray(body.rows));
+    assert.ok(Array.isArray(body.nullSlots));
+    assert.ok(body.rows.every(row => ['01', '02', '03'].includes(row.DRCT_CD)));
+  });
+
+  test('weekly direction response shape', async () => {
+    const { status, body } = await request(server, 'GET', '/api/traffic/direction/weekly?node_id=A001&acsr_id=1&week_start=2026-03-15');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.directions));
+    assert.ok(Array.isArray(body.rows));
+    assert.ok(typeof body.nullSlots === 'object' && !Array.isArray(body.nullSlots));
+  });
+
+  test('monthly direction response shape', async () => {
+    const { status, body } = await request(server, 'GET', '/api/traffic/direction/monthly?node_id=A001&acsr_id=1&month=2026-03');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.directions));
+    assert.ok(Array.isArray(body.rows));
+    assert.ok(typeof body.nullSlots === 'object' && !Array.isArray(body.nullSlots));
+  });
+
+  test('yearly direction response shape', async () => {
+    const { status, body } = await request(server, 'GET', '/api/traffic/direction/yearly?node_id=A001&acsr_id=1&year=2026');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.directions));
+    assert.ok(Array.isArray(body.rows));
+    assert.ok(Array.isArray(body.nullSlots));
   });
 });
 

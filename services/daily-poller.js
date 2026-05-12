@@ -109,6 +109,7 @@ async function poll() {
         cur = new Date(cur.getTime() + UPDATE_INTERVAL_MS);
       }
 
+      const prevLastSeen = lastSeen;
       lastSeen          = new Date(latestRow.TOT_DT);
       currentUpdateTime = latestRounded;
       targetUpdateTime  = new Date(latestRounded.getTime() + UPDATE_INTERVAL_MS);
@@ -120,6 +121,27 @@ async function poll() {
           rows:      result.rows,
           nullSlots: getNullSlotsForMonth(today.slice(0, 7)),
         });
+      }
+
+      try {
+        const directionResult = await execute(
+          `SELECT NODE_ID, ACSR_ID, DRCT_CD, TOT_DT, TRF_QNTY,
+                  TO_CHAR(TOT_DT, 'YYYY-MM-DD') AS SLOT_LABEL
+             FROM S_CRSRD_DRCT_TRF_1DD
+            WHERE TOT_DT > :prevLastSeen
+              AND TOT_DT <= :lastSeen
+              AND DRCT_CD IN ('01', '02', '03')
+            ORDER BY TOT_DT ASC, DRCT_CD ASC`,
+          { prevLastSeen, lastSeen }
+        );
+        if (broadcastFn && directionResult.rows.length > 0) {
+          broadcastFn('direction-daily-traffic-update', {
+            rows: directionResult.rows,
+            nullSlots: getNullSlotsForMonth(today.slice(0, 7)),
+          });
+        }
+      } catch (directionErr) {
+        console.error('[DailyPoller] 방향별 쿼리 오류:', directionErr.message);
       }
     } else {
       // 데이터 없음: 타임아웃 체크

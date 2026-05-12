@@ -14,6 +14,10 @@ function createTrafficRouter({ trafficController }) {
   router.get('/approach/weekly', (req, res) => trafficController.getApproachWeeklyTraffic(req, res));
   router.get('/approach/monthly', (req, res) => trafficController.getApproachMonthlyTraffic(req, res));
   router.get('/approach/yearly', (req, res) => trafficController.getApproachYearlyTraffic(req, res));
+  router.get('/direction', (req, res) => trafficController.getDirectionTraffic(req, res));
+  router.get('/direction/weekly', (req, res) => trafficController.getDirectionWeeklyTraffic(req, res));
+  router.get('/direction/monthly', (req, res) => trafficController.getDirectionMonthlyTraffic(req, res));
+  router.get('/direction/yearly', (req, res) => trafficController.getDirectionYearlyTraffic(req, res));
 
   return router;
 }
@@ -21,4 +25,3 @@ function createTrafficRouter({ trafficController }) {
 module.exports = {
   createTrafficRouter,
 };
-

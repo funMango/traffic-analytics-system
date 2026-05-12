@@ -115,6 +115,27 @@ async function poll() {
       } catch (trfErr) {
         console.error('[HourlyPoller] 교차로 쿼리 오류:', trfErr.message);
       }
+
+      try {
+        const directionResult = await execute(
+          `SELECT NODE_ID, ACSR_ID, DRCT_CD, TOT_DT, TRF_QNTY,
+                  TO_CHAR(TRUNC(TOT_DT, 'HH'), 'YYYY-MM-DD HH24:MI') AS SLOT_LABEL
+             FROM S_CRSRD_DRCT_TRF_1HH
+            WHERE TOT_DT > :prevLastSeen
+              AND TOT_DT <= :lastSeen
+              AND DRCT_CD IN ('01', '02', '03')
+            ORDER BY TOT_DT ASC, DRCT_CD ASC`,
+          { prevLastSeen, lastSeen }
+        );
+        if (broadcastFn && directionResult.rows.length > 0) {
+          broadcastFn('direction-hourly-traffic-update', {
+            rows: directionResult.rows,
+            nullSlots: getNullSlotsForDate(today),
+          });
+        }
+      } catch (directionErr) {
+        console.error('[HourlyPoller] 방향별 쿼리 오류:', directionErr.message);
+      }
     } else {
       console.log(`[HourlyPoller] 신규 데이터 없음 (lastSeen: ${lastSeen?.toISOString()})`);
     }

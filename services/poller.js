@@ -135,6 +135,7 @@ async function poll() {
         cur = new Date(cur.getTime() + UPDATE_INTERVAL_MS);
       }
 
+      const prevLastSeen = lastSeen;
       lastSeen          = new Date(latestRow.TOT_DT);
       currentUpdateTime = latestRounded;
       targetUpdateTime  = new Date(latestRounded.getTime() + UPDATE_INTERVAL_MS);
@@ -153,9 +154,10 @@ async function poll() {
         const approachResult = await execute(
           `SELECT NODE_ID, ACSR_ID, TOT_DT, TRF_QNTY
              FROM S_CRSRD_ACSR_TRF_5MI
-            WHERE TOT_DT > :lastSeen
+            WHERE TOT_DT > :prevLastSeen
+              AND TOT_DT <= :lastSeen
             ORDER BY TOT_DT ASC`,
-          { lastSeen }
+          { prevLastSeen, lastSeen }
         );
         const nonZeroApproachRows = approachResult.rows.filter(r => r.TRF_QNTY != null && r.TRF_QNTY > 0);
         if (nonZeroApproachRows.length > 0 && broadcastFn) {
@@ -166,6 +168,28 @@ async function poll() {
         }
       } catch (approachErr) {
         console.error('[Poller] 접근로 쿼리 오류:', approachErr.message);
+      }
+
+      try {
+        const directionResult = await execute(
+          `SELECT NODE_ID, ACSR_ID, DRCT_CD, TOT_DT, TRF_QNTY,
+                  TO_CHAR(TOT_DT, 'HH24:MI') AS SLOT_LABEL
+             FROM S_CRSRD_DRCT_TRF_5MI
+            WHERE TOT_DT > :prevLastSeen
+              AND TOT_DT <= :lastSeen
+              AND DRCT_CD IN ('01', '02', '03')
+            ORDER BY TOT_DT ASC, DRCT_CD ASC`,
+          { prevLastSeen, lastSeen }
+        );
+        const directionRows = directionResult.rows.filter(r => r.TRF_QNTY != null && r.TRF_QNTY > 0);
+        if (directionRows.length > 0 && broadcastFn) {
+          broadcastFn('direction-traffic-update', {
+            rows: directionRows,
+            nullSlots: getNullSlotsForDate(today),
+          });
+        }
+      } catch (directionErr) {
+        console.error('[Poller] 방향별 쿼리 오류:', directionErr.message);
       }
     } else {
       // 데이터 없음: 타임아웃 체크

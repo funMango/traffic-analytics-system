@@ -121,7 +121,10 @@ const DirectionDetailApp = (() => {
     datePicker: () => document.getElementById('datePicker'),
     chartPlaceholder: () => document.getElementById('chartPlaceholder'),
     trafficChart: () => document.getElementById('trafficChart'),
+    turnChartPlaceholder: () => document.getElementById('turnChartPlaceholder'),
+    turnTrafficChart: () => document.getElementById('turnTrafficChart'),
     chartGranularity: () => document.getElementById('chartGranularity'),
+    turnChartGranularity: () => document.getElementById('turnChartGranularity'),
   };
 
   function filterText(text, query) {
@@ -317,9 +320,30 @@ const DirectionDetailApp = (() => {
     canvas.style.display = 'none';
   }
 
+  function showTurnPlaceholder(message, isError = false) {
+    const placeholder = els.turnChartPlaceholder();
+    const canvas = els.turnTrafficChart();
+    if (!placeholder || !canvas) return;
+
+    placeholder.style.display = 'flex';
+    placeholder.innerHTML = `<p style="color:${isError ? '#ef4444' : '#64748b'}">${escapeHtml(message)}</p>`;
+    canvas.style.display = 'none';
+    DirectionTurnChartManager.destroy();
+  }
+
   function showLoading() {
     const placeholder = els.chartPlaceholder();
     const canvas = els.trafficChart();
+    if (!placeholder || !canvas) return;
+
+    placeholder.style.display = 'flex';
+    placeholder.innerHTML = '<div class="loading-spinner"></div>';
+    canvas.style.display = 'none';
+  }
+
+  function showTurnLoading() {
+    const placeholder = els.turnChartPlaceholder();
+    const canvas = els.turnTrafficChart();
     if (!placeholder || !canvas) return;
 
     placeholder.style.display = 'flex';
@@ -331,12 +355,14 @@ const DirectionDetailApp = (() => {
     const el = els.chartGranularity();
     if (!el) return;
     const map = {
-      '1d': '(5? ??)',
-      '1w': '(15? ??)',
-      '1m': '(1?? ??)',
-      '1y': '(1? ??)',
+      '1d': '(5분 단위)',
+      '1w': '(15분 단위)',
+      '1m': '(1시간 단위)',
+      '1y': '(1일 단위)',
     };
     el.textContent = map[period] || '';
+    const turnEl = els.turnChartGranularity();
+    if (turnEl) turnEl.textContent = map[period] || '';
   }
 
   function updateDateDisplay() {
@@ -385,9 +411,25 @@ const DirectionDetailApp = (() => {
     return (rows || []).filter((row) => String(row.ACSR_ID) === String(state.acsrId));
   }
 
+  function getTurnLabels() {
+    if (state.currentPeriod === '1w') return DirectionTurnChartManager.generateWeeklyLabels(state.currentWeekStart);
+    if (state.currentPeriod === '1m') return DirectionTurnChartManager.generateMonthlyLabels(state.currentMonthStr);
+    if (state.currentPeriod === '1y') return DirectionTurnChartManager.generateYearlyLabels(state.currentYearStr);
+    return DirectionTurnChartManager.generateDailyLabels();
+  }
+
+  function showTurnChart() {
+    const placeholder = els.turnChartPlaceholder();
+    const canvas = els.turnTrafficChart();
+    if (!placeholder || !canvas) return;
+    canvas.style.display = 'block';
+    placeholder.style.display = 'none';
+  }
+
   async function loadCurrentPeriodData() {
     if (!state.nodeId || !state.acsrId) {
       showPlaceholder('?? ????(node_id, acsr_id)? ????.', true);
+      showTurnPlaceholder('방향 정보(node_id, acsr_id)가 없습니다.', true);
       return;
     }
 
@@ -396,18 +438,32 @@ const DirectionDetailApp = (() => {
     if (!canvas || !placeholder) return;
 
     showLoading();
+    showTurnLoading();
 
     try {
       let response = null;
+      let turnResponse = null;
 
       if (state.currentPeriod === '1w') {
-        response = await API.getApproachWeeklyTraffic(state.nodeId, state.currentWeekStart);
+        [response, turnResponse] = await Promise.all([
+          API.getApproachWeeklyTraffic(state.nodeId, state.currentWeekStart),
+          API.getDirectionWeeklyTraffic(state.nodeId, state.acsrId, state.currentWeekStart),
+        ]);
       } else if (state.currentPeriod === '1m') {
-        response = await API.getApproachMonthlyTraffic(state.nodeId, state.currentMonthStr);
+        [response, turnResponse] = await Promise.all([
+          API.getApproachMonthlyTraffic(state.nodeId, state.currentMonthStr),
+          API.getDirectionMonthlyTraffic(state.nodeId, state.acsrId, state.currentMonthStr),
+        ]);
       } else if (state.currentPeriod === '1y') {
-        response = await API.getApproachYearlyTraffic(state.nodeId, state.currentYearStr);
+        [response, turnResponse] = await Promise.all([
+          API.getApproachYearlyTraffic(state.nodeId, state.currentYearStr),
+          API.getDirectionYearlyTraffic(state.nodeId, state.acsrId, state.currentYearStr),
+        ]);
       } else {
-        response = await API.getApproachTraffic(state.nodeId, state.currentDate);
+        [response, turnResponse] = await Promise.all([
+          API.getApproachTraffic(state.nodeId, state.currentDate),
+          API.getDirectionTraffic(state.nodeId, state.acsrId, state.currentDate),
+        ]);
       }
 
       const approaches = response.approaches || [];
@@ -426,25 +482,57 @@ const DirectionDetailApp = (() => {
         const currentWeek = isCurrentWeek(state.currentWeekStart);
         ChartManager.initWeekly('trafficChart', state.currentWeekStart);
         ChartManager.updateWeekly(filteredRows, state.currentWeekStart, currentWeek, response.nullSlots || {});
+        renderTurnChart(turnResponse, currentWeek, response.nullSlots || {});
       } else if (state.currentPeriod === '1m') {
         const currentMonth = isCurrentMonth(state.currentMonthStr);
         ChartManager.initMonthly('trafficChart', state.currentMonthStr);
         ChartManager.updateMonthly(filteredRows, state.currentMonthStr, currentMonth, response.nullSlots || {});
+        renderTurnChart(turnResponse, currentMonth, response.nullSlots || {});
       } else if (state.currentPeriod === '1y') {
         const currentYear = isCurrentYear(state.currentYearStr);
         ChartManager.initYearly('trafficChart', state.currentYearStr);
         ChartManager.updateYearly(filteredRows, state.currentYearStr, currentYear, response.nullSlots || []);
+        renderTurnChart(turnResponse, currentYear, response.nullSlots || []);
       } else {
         const isToday = state.currentDate === todayStr();
         ChartManager.init('trafficChart');
         ChartManager.update(filteredRows, isToday, response.nullSlots || []);
+        renderTurnChart(turnResponse, isToday, response.nullSlots || []);
       }
 
       setLastUpdateByRows(filteredRows);
     } catch (err) {
       console.error('[DirectionDetail] load failed', err);
       showPlaceholder(`??? ?? ??: ${err.message}`, true);
+      showTurnPlaceholder(`방향별 교통량 조회 실패: ${err.message}`, true);
     }
+  }
+
+  function renderTurnChart(response, isCurrentRange, nullSlots) {
+    const rows = response?.rows || [];
+    const labels = getTurnLabels();
+    if (
+      rows.length === 0
+      || !DirectionTurnChartManager.hasMappedMeasuredRows(
+        response?.directions || [],
+        rows,
+        labels,
+        state.currentPeriod
+      )
+    ) {
+      showTurnPlaceholder('방향별 교통량 데이터가 없습니다');
+      return;
+    }
+
+    showTurnChart();
+    DirectionTurnChartManager.update(
+      response.directions || [],
+      rows,
+      labels,
+      state.currentPeriod,
+      isCurrentRange,
+      response.nullSlots || nullSlots || []
+    );
   }
 
   function changeDailyDate(delta) {
@@ -587,6 +675,7 @@ const DirectionDetailApp = (() => {
       if (state.currentPeriod !== '1d') return;
       if (state.currentDate !== todayStr()) return;
       ChartManager.applyNullSlots(nullSlots, state.currentDate);
+      DirectionTurnChartManager.mergeNewRows([], state.nodeId, state.acsrId, nullSlots || []);
     });
 
     API.on('approach-traffic-update', ({ rows, nullSlots }) => {
@@ -604,11 +693,25 @@ const DirectionDetailApp = (() => {
       setLastUpdateByRows(filteredRows);
     });
 
+    API.on('direction-traffic-update', ({ rows, nullSlots }) => {
+      if (state.currentPeriod !== '1d') return;
+      if (state.currentDate !== todayStr()) return;
+
+      const filteredRows = (rows || []).filter((r) => {
+        return String(r.NODE_ID) === String(state.nodeId)
+          && String(r.ACSR_ID) === String(state.acsrId)
+          && new Date(r.TOT_DT).toISOString().slice(0, 10) === state.currentDate;
+      });
+
+      DirectionTurnChartManager.mergeNewRows(filteredRows, state.nodeId, state.acsrId, nullSlots || []);
+    });
+
     API.on('fifteen-min-null-slots', ({ nullSlots }) => {
       if (state.currentPeriod !== '1w') return;
       if (!isCurrentWeek(state.currentWeekStart)) return;
       const today = todayStr();
       ChartManager.applyHourlyNullSlots({ [today]: nullSlots || [] }, state.currentWeekStart);
+      DirectionTurnChartManager.mergeNewRows([], state.nodeId, state.acsrId, { [today]: nullSlots || [] });
     });
 
     API.on('fifteen-min-traffic-update', ({ rows, nullSlots }) => {
@@ -628,11 +731,27 @@ const DirectionDetailApp = (() => {
       setLastUpdateByRows(filteredRows);
     });
 
+    API.on('direction-fifteen-min-traffic-update', ({ rows, nullSlots }) => {
+      if (state.currentPeriod !== '1w') return;
+      if (!isCurrentWeek(state.currentWeekStart)) return;
+
+      const today = todayStr();
+      const filteredRows = (rows || []).filter((r) => {
+        return String(r.NODE_ID) === String(state.nodeId)
+          && String(r.ACSR_ID) === String(state.acsrId)
+          && new Date(r.TOT_DT).toISOString().slice(0, 10) === today;
+      });
+
+      const nullObj = (nullSlots && nullSlots.length > 0) ? { [today]: nullSlots } : {};
+      DirectionTurnChartManager.mergeNewRows(filteredRows, state.nodeId, state.acsrId, nullObj);
+    });
+
     API.on('hourly-null-slots', ({ nullSlots }) => {
       if (state.currentPeriod !== '1m') return;
       if (!isCurrentMonth(state.currentMonthStr)) return;
       const today = todayStr();
       ChartManager.applyDailyNullSlots({ [today]: nullSlots || [] }, state.currentMonthStr);
+      DirectionTurnChartManager.mergeNewRows([], state.nodeId, state.acsrId, { [today]: nullSlots || [] });
     });
 
     API.on('hourly-traffic-update', ({ rows, nullSlots }) => {
@@ -657,10 +776,25 @@ const DirectionDetailApp = (() => {
       setLastUpdateByRows(filteredRows);
     });
 
+    API.on('direction-hourly-traffic-update', ({ rows, nullSlots }) => {
+      if (state.currentPeriod !== '1m') return;
+      if (!isCurrentMonth(state.currentMonthStr)) return;
+
+      const today = todayStr();
+      const filteredRows = (rows || []).filter((r) => {
+        return String(r.NODE_ID) === String(state.nodeId)
+          && String(r.ACSR_ID) === String(state.acsrId)
+          && new Date(r.TOT_DT).toISOString().slice(0, 7) === state.currentMonthStr;
+      });
+
+      DirectionTurnChartManager.mergeNewRows(filteredRows, state.nodeId, state.acsrId, { [today]: nullSlots || [] });
+    });
+
     API.on('daily-null-slots', ({ nullSlots }) => {
       if (state.currentPeriod !== '1y') return;
       if (!isCurrentYear(state.currentYearStr)) return;
       ChartManager.applyDailyNullSlotsYearly(nullSlots || [], state.currentYearStr);
+      DirectionTurnChartManager.mergeNewRows([], state.nodeId, state.acsrId, nullSlots || []);
     });
 
     API.on('daily-traffic-update', ({ rows, nullSlots }) => {
@@ -682,6 +816,19 @@ const DirectionDetailApp = (() => {
 
       if (!updated || filteredRows.length === 0) return;
       setLastUpdateByRows(filteredRows);
+    });
+
+    API.on('direction-daily-traffic-update', ({ rows, nullSlots }) => {
+      if (state.currentPeriod !== '1y') return;
+      if (!isCurrentYear(state.currentYearStr)) return;
+
+      const filteredRows = (rows || []).filter((r) => {
+        return String(r.NODE_ID) === String(state.nodeId)
+          && String(r.ACSR_ID) === String(state.acsrId)
+          && String(new Date(r.TOT_DT).getFullYear()) === state.currentYearStr;
+      });
+
+      DirectionTurnChartManager.mergeNewRows(filteredRows, state.nodeId, state.acsrId, nullSlots || []);
     });
   }
 
@@ -768,6 +915,7 @@ const DirectionDetailApp = (() => {
     if (!state.nodeId || !state.acsrId) {
       disableControls();
       showPlaceholder('?? ????(node_id, acsr_id)? ????.', true);
+      showTurnPlaceholder('방향 정보(node_id, acsr_id)가 없습니다.', true);
       return;
     }
 

@@ -9,5 +9,8 @@ export interface TrafficRepositoryPort {
   findApproachWeeklyTraffic(nodeId: string, rangeStart: Date, rangeEnd: Date): Promise<unknown[]>;
   findApproachMonthlyTraffic(nodeId: string, rangeStart: Date, rangeEnd: Date): Promise<unknown[]>;
   findApproachYearlyTraffic(nodeId: string, rangeStart: Date, rangeEnd: Date): Promise<unknown[]>;
+  findDirectionDailyTraffic(nodeId: string, acsrId: string, dateStr: string, rangeEnd: Date): Promise<unknown[]>;
+  findDirectionWeeklyTraffic(nodeId: string, acsrId: string, rangeStart: Date, rangeEnd: Date): Promise<unknown[]>;
+  findDirectionMonthlyTraffic(nodeId: string, acsrId: string, rangeStart: Date, rangeEnd: Date): Promise<unknown[]>;
+  findDirectionYearlyTraffic(nodeId: string, acsrId: string, rangeStart: Date, rangeEnd: Date): Promise<unknown[]>;
 }
-

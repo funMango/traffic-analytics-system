@@ -8,6 +8,12 @@ function requireNodeId(nodeId) {
   }
 }
 
+function requireAcsrId(acsrId) {
+  if (!acsrId) {
+    throw new BadRequestError('acsr_id parameter is required');
+  }
+}
+
 function validateDate(dateStr) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     throw new BadRequestError('date 형식은 YYYY-MM-DD 이어야 합니다');
@@ -51,10 +57,10 @@ function getTodayDateStr() {
 
 module.exports = {
   requireNodeId,
+  requireAcsrId,
   validateDate,
   validateWeekStart,
   validateMonth,
   validateYear,
   getTodayDateStr,
 };
-

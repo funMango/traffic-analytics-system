@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/api.test.js tests/home-cache.test.js tests/direction-detail-page.test.js",
+    "test": "node --test tests/api.test.js tests/home-cache.test.js tests/direction-detail-page.test.js tests/direction-turn-chart.test.js tests/oracle-traffic-repository.test.js",
     "architecture:check": "node scripts/check-architecture.js",
     "quality": "npm run architecture:check && npm test"
   },

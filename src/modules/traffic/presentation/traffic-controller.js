@@ -54,10 +54,25 @@ function createTrafficController({ trafficUseCases, logger }) {
     async getApproachYearlyTraffic(req, res) {
       await run(res, () => trafficUseCases.getApproachYearlyTraffic(req.query), '접근로 연간 교통량 데이터 조회 실패');
     },
+
+    async getDirectionTraffic(req, res) {
+      await run(res, () => trafficUseCases.getDirectionTraffic(req.query), '방향별 교통량 데이터 조회 실패');
+    },
+
+    async getDirectionWeeklyTraffic(req, res) {
+      await run(res, () => trafficUseCases.getDirectionWeeklyTraffic(req.query), '방향별 주간 교통량 데이터 조회 실패');
+    },
+
+    async getDirectionMonthlyTraffic(req, res) {
+      await run(res, () => trafficUseCases.getDirectionMonthlyTraffic(req.query), '방향별 월간 교통량 데이터 조회 실패');
+    },
+
+    async getDirectionYearlyTraffic(req, res) {
+      await run(res, () => trafficUseCases.getDirectionYearlyTraffic(req.query), '방향별 연간 교통량 데이터 조회 실패');
+    },
   };
 }
 
 module.exports = {
   createTrafficController,
 };
-

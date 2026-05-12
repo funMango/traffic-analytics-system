@@ -3,6 +3,7 @@
 const { BadRequestError, NotFoundError } = require('../../../../shared/domain/errors/http-errors');
 const {
   requireNodeId,
+  requireAcsrId,
   validateDate,
   validateWeekStart,
   validateMonth,
@@ -100,6 +101,12 @@ function mapApproaches(rows) {
     .filter(row => !EXCLUDED_APPROACH_NAMES.has(row.ACSR_NM))
     .map(row => ({ acsrId: row.ACSR_ID, name: row.ACSR_NM }));
 }
+
+const DIRECTIONS = [
+  { drctCd: '01', label: '좌' },
+  { drctCd: '02', label: '직' },
+  { drctCd: '03', label: '우' },
+];
 
 function createTrafficUseCases({ trafficRepository, trafficStatusProvider }) {
   return {
@@ -249,10 +256,84 @@ function createTrafficUseCases({ trafficRepository, trafficStatusProvider }) {
         nullSlots: trafficStatusProvider.getYearlyNullSlots(year),
       };
     },
+
+    async getDirectionTraffic(query) {
+      const nodeId = query.node_id;
+      const acsrId = query.acsr_id;
+      requireNodeId(nodeId);
+      requireAcsrId(acsrId);
+
+      const dateStr = query.date || getTodayDateStr();
+      validateDate(dateStr);
+
+      const rangeEnd = getRangeEndForDaily(dateStr, trafficStatusProvider.getCurrent5MinTarget());
+      const rows = await trafficRepository.findDirectionDailyTraffic(nodeId, acsrId, dateStr, rangeEnd);
+      const nullSlots = dateStr === getTodayDateStr()
+        ? trafficStatusProvider.getDailyNullSlots(dateStr)
+        : [];
+
+      return { directions: DIRECTIONS, rows, nullSlots };
+    },
+
+    async getDirectionWeeklyTraffic(query) {
+      const nodeId = query.node_id;
+      const acsrId = query.acsr_id;
+      const weekStart = query.week_start;
+      requireNodeId(nodeId);
+      requireAcsrId(acsrId);
+      validateWeekStart(weekStart);
+
+      const weekStartDate = new Date(`${weekStart}T00:00:00`);
+      const rangeEnd = getRangeEndForWeekly(weekStartDate, trafficStatusProvider.getCurrent15MinTarget());
+      const rows = await trafficRepository.findDirectionWeeklyTraffic(nodeId, acsrId, weekStartDate, rangeEnd);
+
+      return {
+        directions: DIRECTIONS,
+        rows,
+        nullSlots: buildWeeklyNullSlotsMap(weekStartDate, rangeEnd, trafficStatusProvider),
+      };
+    },
+
+    async getDirectionMonthlyTraffic(query) {
+      const nodeId = query.node_id;
+      const acsrId = query.acsr_id;
+      const month = query.month;
+      requireNodeId(nodeId);
+      requireAcsrId(acsrId);
+      validateMonth(month);
+
+      const { rangeStart, rangeEnd } = getRangeForMonth(month, trafficStatusProvider.getCurrentHourlyTarget());
+      const rows = await trafficRepository.findDirectionMonthlyTraffic(nodeId, acsrId, rangeStart, rangeEnd);
+
+      return {
+        directions: DIRECTIONS,
+        rows,
+        nullSlots: isCurrentMonth(month)
+          ? trafficStatusProvider.getMonthlyNullSlots(month)
+          : {},
+      };
+    },
+
+    async getDirectionYearlyTraffic(query) {
+      const nodeId = query.node_id;
+      const acsrId = query.acsr_id;
+      const year = query.year;
+      requireNodeId(nodeId);
+      requireAcsrId(acsrId);
+      validateYear(year);
+
+      const { rangeStart, rangeEnd } = getRangeForYear(year, trafficStatusProvider.getCurrentDailyTarget());
+      const rows = await trafficRepository.findDirectionYearlyTraffic(nodeId, acsrId, rangeStart, rangeEnd);
+
+      return {
+        directions: DIRECTIONS,
+        rows,
+        nullSlots: trafficStatusProvider.getYearlyNullSlots(year),
+      };
+    },
   };
 }
 
 module.exports = {
   createTrafficUseCases,
 };
-

@@ -62,6 +62,22 @@ const API = (() => {
     return fetchJSON(`/api/traffic/approach/yearly?node_id=${encodeURIComponent(nodeId)}&year=${year}`);
   }
 
+  function getDirectionTraffic(nodeId, acsrId, date) {
+    return fetchJSON(`/api/traffic/direction?node_id=${encodeURIComponent(nodeId)}&acsr_id=${encodeURIComponent(acsrId)}&date=${date}`);
+  }
+
+  function getDirectionWeeklyTraffic(nodeId, acsrId, weekStart) {
+    return fetchJSON(`/api/traffic/direction/weekly?node_id=${encodeURIComponent(nodeId)}&acsr_id=${encodeURIComponent(acsrId)}&week_start=${weekStart}`);
+  }
+
+  function getDirectionMonthlyTraffic(nodeId, acsrId, month) {
+    return fetchJSON(`/api/traffic/direction/monthly?node_id=${encodeURIComponent(nodeId)}&acsr_id=${encodeURIComponent(acsrId)}&month=${month}`);
+  }
+
+  function getDirectionYearlyTraffic(nodeId, acsrId, year) {
+    return fetchJSON(`/api/traffic/direction/yearly?node_id=${encodeURIComponent(nodeId)}&acsr_id=${encodeURIComponent(acsrId)}&year=${year}`);
+  }
+
   function getHomeMissingSummary({ year, type }) {
     const params = new URLSearchParams({ period: '1y' });
     if (year) params.set('year', year);
@@ -187,6 +203,26 @@ const API = (() => {
       (listeners['approach-traffic-update'] || []).forEach(cb => cb(data));
     });
 
+    es.addEventListener('direction-traffic-update', (e) => {
+      const data = JSON.parse(e.data);
+      (listeners['direction-traffic-update'] || []).forEach(cb => cb(data));
+    });
+
+    es.addEventListener('direction-fifteen-min-traffic-update', (e) => {
+      const data = JSON.parse(e.data);
+      (listeners['direction-fifteen-min-traffic-update'] || []).forEach(cb => cb(data));
+    });
+
+    es.addEventListener('direction-hourly-traffic-update', (e) => {
+      const data = JSON.parse(e.data);
+      (listeners['direction-hourly-traffic-update'] || []).forEach(cb => cb(data));
+    });
+
+    es.addEventListener('direction-daily-traffic-update', (e) => {
+      const data = JSON.parse(e.data);
+      (listeners['direction-daily-traffic-update'] || []).forEach(cb => cb(data));
+    });
+
     es.onerror = () => {
       console.warn('[SSE] 연결 오류 - 재연결 대기');
       onStatusChange && onStatusChange('disconnected');
@@ -218,6 +254,10 @@ const API = (() => {
     getApproachWeeklyTraffic,
     getApproachMonthlyTraffic,
     getApproachYearlyTraffic,
+    getDirectionTraffic,
+    getDirectionWeeklyTraffic,
+    getDirectionMonthlyTraffic,
+    getDirectionYearlyTraffic,
     getHomeMissingSummary,
     getHomeMissingDetail,
     getHomeTodayAbnormal,

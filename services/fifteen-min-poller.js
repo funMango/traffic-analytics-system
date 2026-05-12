@@ -106,6 +106,7 @@ async function poll() {
         cur = new Date(cur.getTime() + UPDATE_INTERVAL_MS);
       }
 
+      const prevLastSeen = lastSeen;
       lastSeen          = new Date(latestRow.TOT_DT);
       currentUpdateTime = latestRounded;
       targetUpdateTime  = new Date(latestRounded.getTime() + UPDATE_INTERVAL_MS);
@@ -117,6 +118,27 @@ async function poll() {
           rows:      result.rows,
           nullSlots: getNullSlotsForDate(today),
         });
+      }
+
+      try {
+        const directionResult = await execute(
+          `SELECT NODE_ID, ACSR_ID, DRCT_CD, TOT_DT, TRF_QNTY,
+                  TO_CHAR(TOT_DT, 'YYYY-MM-DD HH24:MI') AS SLOT_LABEL
+             FROM S_CRSRD_DRCT_TRF_15MI
+            WHERE TOT_DT > :prevLastSeen
+              AND TOT_DT <= :lastSeen
+              AND DRCT_CD IN ('01', '02', '03')
+            ORDER BY TOT_DT ASC, DRCT_CD ASC`,
+          { prevLastSeen, lastSeen }
+        );
+        if (directionResult.rows.length > 0 && broadcastFn) {
+          broadcastFn('direction-fifteen-min-traffic-update', {
+            rows: directionResult.rows,
+            nullSlots: getNullSlotsForDate(today),
+          });
+        }
+      } catch (directionErr) {
+        console.error('[FifteenMinPoller] 방향별 쿼리 오류:', directionErr.message);
       }
     } else {
       // 데이터 없음: 타임아웃 체크

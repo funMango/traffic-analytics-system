@@ -6,6 +6,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const request = require('supertest');
 
+require.cache[require.resolve('../db')] = {
+  id: require.resolve('../db'),
+  filename: require.resolve('../db'),
+  loaded: true,
+  exports: {
+    execute: async () => ({ rows: [] }),
+  },
+};
+
 const app = require('../app');
 
 describe('direction-detail template integrity', () => {
@@ -17,6 +26,9 @@ describe('direction-detail template integrity', () => {
     assert.ok(html.includes('<h2 id="directionName"'));
     assert.ok(html.includes('</h2>'));
     assert.ok(html.includes('id="backBtn"'));
+    assert.ok(html.includes('id="turnTrafficChart"'));
+    assert.ok(html.includes('id="turnChartPlaceholder"'));
+    assert.ok(html.includes('/js/direction-turn-chart.js?v=7'));
     assert.ok(html.includes('data-period="1d">1일</button>'));
     assert.ok(html.includes('data-period="1w">1주</button>'));
     assert.ok(html.includes('data-period="1m">1달</button>'));
@@ -36,7 +48,13 @@ describe('direction-detail static route smoke', () => {
   });
 
   test('GET /js/direction-detail.js returns 200 javascript', async () => {
-    const res = await request(app).get('/js/direction-detail.js?v=2');
+    const res = await request(app).get('/js/direction-detail.js?v=4');
+    assert.equal(res.status, 200);
+    assert.match(res.headers['content-type'] || '', /javascript/i);
+  });
+
+  test('GET /js/direction-turn-chart.js returns 200 javascript', async () => {
+    const res = await request(app).get('/js/direction-turn-chart.js?v=7');
     assert.equal(res.status, 200);
     assert.match(res.headers['content-type'] || '', /javascript/i);
   });
